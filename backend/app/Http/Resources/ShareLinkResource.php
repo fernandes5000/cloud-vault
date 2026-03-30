@@ -12,6 +12,8 @@ class ShareLinkResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $appUrl = rtrim((string) config('app.url'), '/');
+
         return [
             'id' => $this->id,
             'token' => $this->token,
@@ -25,8 +27,8 @@ class ShareLinkResource extends JsonResource
             'downloadCount' => $this->download_count,
             'maxDownloads' => $this->max_downloads,
             'isActive' => $this->is_active,
-            'publicUrl' => route('api.v1.public-shares.show', $this->token),
-            'downloadUrl' => route('api.v1.public-shares.download', $this->token),
+            'publicUrl' => $appUrl . route('api.v1.public-shares.show', ['token' => $this->token], false),
+            'downloadUrl' => $appUrl . route('api.v1.public-shares.download', ['token' => $this->token], false),
         ];
     }
 }
