@@ -25,9 +25,26 @@ class PublicShareController extends Controller
         return response()->json([
             'data' => [
                 'share' => ShareLinkResource::make($shareLink),
-                'item' => DriveItemResource::make($shareLink->driveItem),
+                'item' => $this->publicItemPayload($request, $token, $shareLink->driveItem),
             ],
         ]);
+    }
+
+    public function preview(
+        Request $request,
+        string $token,
+        ShareLinkService $shareLinkService,
+        DriveItemService $driveItemService,
+    ) {
+        $shareLink = $shareLinkService->resolve(
+            token: $token,
+            viewer: $request->user(),
+            password: $request->string('password')->toString() ?: null,
+        );
+
+        $shareLinkService->registerAccess($shareLink);
+
+        return $driveItemService->responseForItem($shareLink->driveItem, inline: true);
     }
 
     public function download(
@@ -45,5 +62,18 @@ class PublicShareController extends Controller
         $shareLinkService->registerAccess($shareLink, downloaded: true);
 
         return $driveItemService->responseForItem($shareLink->driveItem);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function publicItemPayload(Request $request, string $token, mixed $driveItem): array
+    {
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $item = DriveItemResource::make($driveItem)->toArray($request);
+        $item['previewUrl'] = $appUrl . route('api.v1.public-shares.preview', ['token' => $token], false);
+        $item['downloadUrl'] = $appUrl . route('api.v1.public-shares.download', ['token' => $token], false);
+
+        return $item;
     }
 }

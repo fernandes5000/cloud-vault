@@ -82,9 +82,21 @@ class DriveUploadShareFlowTest extends TestCase
         $shareResponse->assertCreated()
             ->assertJsonPath('data.visibility', 'public');
 
-        $this->getJson('/api/v1/shares/public/'.$publicToken)
+        $publicShareResponse = $this->getJson('/api/v1/shares/public/'.$publicToken);
+
+        $publicShareResponse
             ->assertOk()
-            ->assertJsonPath('data.item.id', $fileId);
+            ->assertJsonPath('data.item.id', $fileId)
+            ->assertJsonPath('data.item.previewUrl', route('api.v1.public-shares.preview', $publicToken))
+            ->assertJsonPath('data.item.downloadUrl', route('api.v1.public-shares.download', $publicToken));
+
+        $this->get('/api/v1/shares/public/'.$publicToken.'/preview')
+            ->assertOk()
+            ->assertHeader('content-disposition', 'inline; filename=architecture.pdf');
+
+        $this->get('/api/v1/shares/public/'.$publicToken.'/download')
+            ->assertOk()
+            ->assertHeader('content-disposition', 'attachment; filename=architecture.pdf');
 
         $this->assertDatabaseHas('drive_items', [
             'id' => $fileId,
@@ -96,5 +108,33 @@ class DriveUploadShareFlowTest extends TestCase
             'user_id' => $user->id,
             'type' => 'upload.completed',
         ]);
+    }
+
+    public function test_protected_download_returns_unauthorized_json_when_token_is_missing(): void
+    {
+        Storage::fake('local');
+        config(['filesystems.default' => 'local']);
+
+        $user = User::factory()->create();
+        $file = UploadedFile::fake()->createWithContent('manual.pdf', 'download me');
+        $path = $file->store('drive', 'local');
+
+        $driveItem = $user->driveItems()->create([
+            'type' => 'file',
+            'name' => 'manual.pdf',
+            'disk' => 'local',
+            'storage_path' => $path,
+            'mime_type' => 'application/pdf',
+            'extension' => 'pdf',
+            'size_bytes' => strlen('download me'),
+            'preview_status' => 'ready',
+            'metadata' => [],
+        ]);
+
+        $this->get('/api/v1/drive/items/'.$driveItem->id.'/download')
+            ->assertUnauthorized()
+            ->assertJson([
+                'message' => 'Unauthenticated.',
+            ]);
     }
 }
