@@ -18,6 +18,12 @@ const previewable = (item: DriveItem) =>
 
 const shareUrl = computed(() => drive.lastShare?.publicUrl ?? '')
 
+const apiPathFromUrl = (url: string) => {
+  const target = new URL(assetUrl(url))
+
+  return `${target.pathname.replace(/^\/api\/v1/, '')}${target.search}`
+}
+
 const submitFolder = async () => {
   if (!newFolderName.value.trim()) {
     return
@@ -43,9 +49,7 @@ const openPreview = async (item: DriveItem) => {
     return
   }
 
-  const previewPath = new URL(assetUrl(item.previewUrl)).pathname.replace(/^\/api\/v1/, '')
-
-  const response = await http.get(previewPath, {
+  const response = await http.get(apiPathFromUrl(item.previewUrl), {
     responseType: 'blob',
     headers: {
       Accept: item.mimeType || 'application/octet-stream',
@@ -58,6 +62,34 @@ const openPreview = async (item: DriveItem) => {
 
   const blobUrl = URL.createObjectURL(blob)
   window.open(blobUrl, '_blank', 'noopener,noreferrer')
+}
+
+const downloadItem = async (item: DriveItem) => {
+  if (!item.downloadUrl) {
+    return
+  }
+
+  const response = await http.get(apiPathFromUrl(item.downloadUrl), {
+    responseType: 'blob',
+    headers: {
+      Accept: item.mimeType || 'application/octet-stream',
+    },
+  })
+
+  const blob = new Blob([response.data], {
+    type: item.mimeType || 'application/octet-stream',
+  })
+
+  const blobUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = blobUrl
+  link.download = item.name
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
 }
 
 const openItem = async (item: DriveItem) => {
@@ -184,16 +216,14 @@ onMounted(async () => {
               </div>
 
               <div class="flex flex-wrap gap-2">
-                <a
+                <button
                   v-if="item.downloadUrl"
-                  :href="assetUrl(item.downloadUrl)"
                   class="soft-button"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  @click.stop
+                  type="button"
+                  @click.stop="downloadItem(item)"
                 >
                   {{ t('app.download') }}
-                </a>
+                </button>
                 <button
                   v-if="previewable(item) && item.previewUrl"
                   class="soft-button"

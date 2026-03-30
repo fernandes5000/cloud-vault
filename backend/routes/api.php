@@ -27,6 +27,9 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::get('/shares/public/{token}', [PublicShareController::class, 'show'])
         ->middleware('throttle:public-shares')
         ->name('public-shares.show');
+    Route::get('/shares/public/{token}/preview', [PublicShareController::class, 'preview'])
+        ->middleware('throttle:public-shares')
+        ->name('public-shares.preview');
     Route::get('/shares/public/{token}/download', [PublicShareController::class, 'download'])
         ->middleware('throttle:public-shares')
         ->name('public-shares.download');
